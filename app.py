@@ -1,7 +1,9 @@
 from app.bot import run_bot
 from app.config import Config
+from app.database import test_db
 
-config = Config.load_config()
+def main():
+    run_bot()
 
 if __name__ == "__main__":
-    run_bot(config['bot_token'], config['welcome_message'])
+    main()

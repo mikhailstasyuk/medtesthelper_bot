@@ -1,13 +1,20 @@
 import telebot
+from app.config import Config
+from app.database import test_db
 
+config = Config.load_config()
 
-def run_bot(bot_token: str, welcome_message: str = "Hello!") -> None:
+def run_bot() -> None:
     """Run telegram bot with provided token"""
-    bot = telebot.TeleBot(bot_token)
+    BOT_TOKEN = config['bot_token']
+    bot = telebot.TeleBot(BOT_TOKEN)
 
     @bot.message_handler(commands=['start'])
-    def send_welcome(message) -> None:
-        """Send a welcome message to the user"""
+    def start(message) -> None:
+        """Greet user and set up database"""
+        welcome_message = config['welcome_message']
+        test_db()
+
         bot.reply_to(message, welcome_message)
 
     @bot.message_handler(func=lambda message: True)
@@ -20,4 +27,4 @@ def run_bot(bot_token: str, welcome_message: str = "Hello!") -> None:
 if __name__ == "__main__":
     # Example usage
     BOT_TOKEN = "<YOUR_BOT_TOKEN_HERE>"
-    run_bot(BOT_TOKEN)
+    run_bot()

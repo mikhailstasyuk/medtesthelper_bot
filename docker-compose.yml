@@ -1,8 +1,21 @@
 version: '3.8'
 services:
   app:
+    container_name: medtesthelper_bot
     build: .
-    env_file:
-      - .env
+    env_file: ".env" 
     ports:
       - "80:80"
+    depends_on:
+      - postgres
+  postgres:
+    image: postgres:latest
+    container_name: medtesthelper_bot-postgres
+    restart: always
+    env_file: ".env" 
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+volumes:
+  postgres_data:
