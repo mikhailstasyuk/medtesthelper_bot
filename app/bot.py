@@ -1,6 +1,6 @@
 import telebot
 from app.config import Config
-from app.database import test_db
+import app.database as database
 
 config = Config.load_config()
 
@@ -13,9 +13,8 @@ def run_bot() -> None:
     def start(message) -> None:
         """Greet user and set up database"""
         welcome_message = config['welcome_message']
-        test_db()
-
         bot.reply_to(message, welcome_message)
+        database.connect()
 
     @bot.message_handler(func=lambda message: True)
     def echo_message(message) -> None:
