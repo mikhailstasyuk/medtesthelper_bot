@@ -14,7 +14,7 @@ def run_bot() -> None:
         """Greet user and set up database"""
         welcome_message = config['welcome_message']
         bot.reply_to(message, welcome_message)
-        database.connect()
+        database.create_database_tables()
 
     @bot.message_handler(func=lambda message: True)
     def echo_message(message) -> None:
