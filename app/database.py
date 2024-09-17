@@ -1,6 +1,9 @@
+from datetime import date
 import logging
+from typing import List, Dict, Any
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
+from sqlalchemy.orm import Session
 from app.config import Config
 
 config = Config.load_config()
