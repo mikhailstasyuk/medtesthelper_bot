@@ -1,10 +1,11 @@
-from datetime import date
 import logging
-from typing import List, Dict, Any
+
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
-from sqlalchemy.orm import Session
+
 from app.config import Config
+from app.schema import create_tables
+
 
 config = Config.load_config()
 
@@ -17,26 +18,47 @@ else:
 logging.basicConfig(level=log_level)
 logger = logging.getLogger(__name__)
 
-def connect() -> tuple:
+
+def create_database_url(
+    host: str,
+    port: int, 
+    username: str, 
+    password: str, 
+    database: str,
+    drivername : str = 'postgresql' 
+) -> URL:
+    """Construct URL for database connection"""
+    url = URL.create(
+        drivername=drivername,
+        username=username,
+        password=password,
+        host=host,
+        port=port,
+        database=database
+)
+    return url
+
+def create_database_tables() -> None:
+    DB_HOST = config['db_host']
     DB_NAME = config['db_name']
     DB_PORT = config['db_port']
     DB_USER = config['db_user']
     DB_PASSWORD = config['db_password']
 
-    url = URL.create(
-        drivername="postgresql",
+    url = create_database_url(
         username=DB_USER,
         password=DB_PASSWORD,
-        host="postgres",
-        database="postgres"
-)
+        host=DB_HOST,
+        port=DB_PORT,
+        database=DB_NAME
+    )
 
     engine = create_engine(url)
 
     try:
-        with engine.connect() as connection:
-            logger.info("Connection to the database was successful!")
-            return True, connection
+        create_tables(engine)    
+        logger.info("Successfully created tables!")
+
     except Exception as e:
-        logger.error(f"Error connecting to the database: {e}")
-        return False, None
+        logger.error(f"Error creating database tables: {e}")
+        raise

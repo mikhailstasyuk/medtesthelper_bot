@@ -14,6 +14,7 @@ I am here to echo your kind words back to you. Just say anything nice and I'll s
 """
         # Database
         DB_NAME = os.getenv('POSTGRES_DB')
+        DB_HOST = os.getenv('POSTGRES_HOST')
         DB_PORT = os.getenv('POSTGRES_PORT')
         DB_USER = os.getenv('POSTGRES_USER')
         DB_PASSWORD = os.getenv('POSTGRES_PASSWORD')
@@ -24,6 +25,7 @@ I am here to echo your kind words back to you. Just say anything nice and I'll s
             'bot_token': BOT_TOKEN,
             'welcome_message': WELCOME_MESSAGE,
             'db_name': DB_NAME,
+            'db_host': DB_HOST,
             'db_port': DB_PORT,
             'db_user': DB_USER,
             'db_password': DB_PASSWORD,
