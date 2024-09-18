@@ -1,9 +1,10 @@
 import json
+import re
 
 class DataEntry:
     def __init__(self, name, value, unit, ref_range):
         self.name = name
-        self.value = float(value)
+        self.value = float(re.sub(r'[^0-9.]', '', value))
         self.unit = unit
         self.ref_range = ref_range
         self.is_normal = self.calculate_is_normal()
