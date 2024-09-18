@@ -7,3 +7,4 @@ pymupdf4llm
 pandas
 opencv-contrib-python
 img2table
+groq
