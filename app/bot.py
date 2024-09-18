@@ -5,6 +5,7 @@ import telebot
 
 from app.config import Config
 import app.database as database
+from app.llm import chat, wrap_in_json
 from app.ocr import extract_from_pdf, extract_from_image
 
 config = Config.load_config()
@@ -15,26 +16,26 @@ def run_bot():
     bot = telebot.TeleBot(BOT_TOKEN)
     file_infos = []
 
-    def save_to_temp_file(binary_data, type):
+    def save_to_temp_file(binary_data, doc_type):
         """Save binary data to temporary file."""
         try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{type}') as temp_file:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{doc_type}') as temp_file:
                 temp_file.write(binary_data)
                 temp_file_path = temp_file.name
                 return temp_file_path
         except Exception as e:
             raise
-
+    
     def check_document_type(document):
         """Check if document type is supported."""
         is_supported = False
         supported_types = ['json', 'pdf', 'png', 'jpeg', 'jpg']
 
-        for type in supported_types:
-            if (document.mime_type == f'application/{type}' or 
-                document.file_name.endswith(f'.{type}')):
+        for doc_type in supported_types:
+            if (document.mime_type == f'application/{doc_type}' or 
+                document.file_name.endswith(f'.{doc_type}')):
                 is_supported = True
-                return is_supported, type
+                return is_supported, doc_type
         
         return is_supported, None
 
@@ -59,14 +60,14 @@ def run_bot():
         photo = message.photo
 
         if photo:
-            bot.reply_to(message, "Please attach image (png, jpeg) files as documents.")
+            bot.reply_to(message, "Please attach PNG or JPEG files as documents.")
 
     @bot.message_handler(content_types=['document'])
     def handle_document(message):
         """Process attached documents."""
         document = message.document
         
-        is_supported, type = check_document_type(document)
+        is_supported, doc_type = check_document_type(document)
 
         if is_supported:
             file_id = document.file_id
@@ -74,48 +75,44 @@ def run_bot():
             file_infos.append(file_info)
 
             downloaded_file = bot.download_file(file_info.file_path)
-            file_path = save_to_temp_file(downloaded_file, type)
+            file_path = save_to_temp_file(downloaded_file, doc_type)
 
-            bot.reply_to(message, f"Processing your {type} file...")
+            bot.reply_to(message, f"Processing your {doc_type} file...")
 
-            if type == 'json':
-                try:
-                    json_data = json.loads(downloaded_file.decode('utf-8'))
-                    bot.reply_to(message, "JSON data loaded successfully.")
-
-                    bot.reply_to(message, f"Here's a part of your data: {json_data}")
-
-                except json.JSONDecodeError:
-                    bot.reply_to(message, "Error: The file is not a valid JSON.")
-
-            if type == 'pdf':
+            if doc_type == 'pdf':
                 try:
                     with open(file_path, 'r') as file:
-                        md_text = extract_from_pdf(file)
-                    bot.reply_to(message, md_text)
+                        doc_text = extract_from_pdf(file)
+                    bot.reply_to(message, doc_text)
 
                 except Exception as e:
                     bot.reply_to(message, f"Error extracting text from file. {e}")
                     
-            if type in ['png', 'jpeg', 'jpg']:
+            if doc_type in ['png', 'jpeg', 'jpg']:
                 try:
                     dfs = extract_from_image(file_path)
-                    df, *_ = dfs
-                    table_str = str(df.to_dict())
-                    bot.reply_to(message, table_str)
+                    
+                    dicts = [df.to_dict() for df in dfs]
+                    doc_text = str(dicts)
+                    bot.reply_to(message, str(dicts))
 
                 except Exception as e:
-                    bot.reply_to(message, f"Error extracting text from file. {e}")
+                    bot.reply_to(message, 
+                        f"Error extracting text from file. {e}")
 
-
+            response = wrap_in_json(doc_text)
+            bot.reply_to(message, response)
+            add_and_fetch(message, response)
             # files = [file_info.file_path for file_info in file_infos]
             # bot.reply_to(message, ", ".join(files))
-    
-    @bot.message_handler(commands=['add_and_fetch'])
-    def add_and_fetch(message):
-        document = load_document()
-        if document:
-            result = database.add_and_fetch(message.chat.id, document)
+        else:
+            bot.reply_to(message,
+                "Please send the document as a PDF, PNG, or JPEG.")
+            
+    def add_and_fetch(message, json_string):
+        
+        if json_string:
+            result = database.add_and_fetch(message.chat.id, json_string)
             bot.reply_to(message, result)
         else:
             msg_to_user = (
@@ -124,9 +121,12 @@ def run_bot():
             )
             bot.reply_to(message, msg_to_user)
 
-    @bot.message_handler(func=lambda message: True)
+    @bot.message_handler(content_types=['text'])
     def echo_message(message):
-        bot.reply_to(message, message.text)
+        username = message.from_user.first_name
+        
+        response = chat(f"{username}: {message.text}")
+        bot.reply_to(message, response)
     
 
     bot.infinity_polling()
