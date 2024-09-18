@@ -1,4 +1,9 @@
 pyTelegramBotAPI==4.22.1
 python-dotenv==1.0.1
 SQLAlchemy==2.0.34
-img2table[easyocr]
+pytesseract
+psycopg2-binary
+pymupdf4llm
+pandas
+opencv-contrib-python
+img2table
