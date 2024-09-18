@@ -158,7 +158,7 @@ def add_and_fetch(telegram_id, document_json):
             data_entries=document.data
         )
     
-        result = fetch_latest_medical_data(session, telegram_id, document_type="Blood Test")
+        result = fetch_latest_medical_data(session, telegram_id, document_type="Клинический анализ крови")
         if result:
             data = result['data'][0]
             return f"{data['field_name']}: {data['field_value']} {data['unit']} (Normal: {data['is_normal']})"
