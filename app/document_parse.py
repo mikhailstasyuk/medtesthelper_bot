@@ -1,57 +1,81 @@
+from datetime import date
 import json
-import re
 
-class DataEntry:
-    def __init__(self, name, value, unit, ref_range):
-        self.name = name
-        self.value = float(re.sub(r'[^0-9.]', '', value))
-        self.unit = unit
-        self.ref_range = ref_range
-        self.is_normal = self.calculate_is_normal()
-
-    def calculate_is_normal(self):
-        """Calculate if value is within reference range"""
-        if self.ref_range:
-            try:
-                min_val, max_val = map(float, self.ref_range.split('-'))
-                return min_val <= self.value <= max_val
-            except ValueError:
-                return False
-        return False
+class MedTestDataEntry:
+    def __init__(self, name, value, unit, ref_range, commentary):
+        self.name = name.lower()
+        self.value = value.lower()
+        self.unit = unit.lower()
+        self.ref_range = ref_range.lower()
+        self.commentary = commentary.lower()
 
     def __repr__(self):
-        return (f"DataEntry(name={self.name}, value={self.value}, unit={self.unit}, "
-                f"range={self.ref_range}, is_normal={self.is_normal})")
+        return (f"MedicalTestDataEntry(name={self.name}, value={self.value}" 
+                f"unit={self.unit},range={self.ref_range}")
 
+
+class MedStudyDataEntry:
+    def __init__(self, device, result, report, recommendation):
+        self.device = device.lower()
+        self.result = result.lower()
+        self.report = report.lower()
+        self.recommendation = recommendation.lower()
+
+    def __repr__(self):
+        return (f"MedicalTestDataEntry(device={self.device}, result={self.result}" 
+                f"report={self.report},recommendation={self.recommendation}")
+    
 
 class Document:
-    def __init__(self, institution_name="", document_type="", document_date="", data=None):
+    def __init__(self,data_format="", institution_name="", document_type="", document_date="", data=None):
+        self.data_format = data_format
         self.institution_name = institution_name
         self.document_type = document_type
-        self.document_date = document_date
+        try:
+            self.document_date = date.fromisoformat(document_date)
+        except Exception:
+            self.document_date = date.today().isoformat() # if no date assume today
         self.data = data if data is not None else []
 
     @classmethod
     def from_json(cls, json_str):
         """Parse the JSON string"""
         data_dict = json.loads(json_str)
+        data_format = data_dict.get("data_format", "")
         
         institution_name = data_dict.get("institution_name", "")
         document_type = data_dict.get("document_type", "")
         document_date = data_dict.get("document_date", "")
-        
         data_list = data_dict.get("data", [])
-        data_entries = [
-            DataEntry(
-                entry.get("name", ""),
-                entry.get("value", ""),
-                entry.get("unit", ""),
-                entry.get("range", ""),
-            )
-            for entry in data_list
-        ]
+
+        if data_format:
+            if data_format == "test":
+                data_entries = [
+                    MedTestDataEntry(
+                        entry.get("name", ""),
+                        entry.get("value", ""),
+                        entry.get("unit", ""),
+                        entry.get("range", ""),
+                        entry.get("commentary", "")
+                    )
+                    for entry in data_list
+                ]
+
+            if data_format == "study":
+                data_entries = [
+                    MedStudyDataEntry(
+                        entry.get("device", ""),
+                        entry.get("result", ""),
+                        entry.get("report", ""),
+                        entry.get("recommendation", ""),
+                    )
+                    for entry in data_list
+                ]
         
-        return cls(institution_name, document_type, document_date, data_entries)
+            return cls(data_format, institution_name, document_type, document_date, data_entries)
+        else:
+            return None
+        
 
     def __repr__(self):
         return (f"Document(institution_name={self.institution_name}, document_type={self.document_type}, "
