@@ -9,8 +9,11 @@ from img2table.document import PDF
 import pandas as pd
 import pymupdf4llm
 
-from app.preprocesssing import preprocess
+from app.preprocesssing import preprocess, check_image_dpi
 
+class LowDPIError(Exception):
+    """Custom exception for images that don't meet the minimum DPI requirement."""
+    pass
 
 def extract_from_pdf(src):
     """Extract text from a pdf."""
@@ -21,9 +24,17 @@ def extract_from_pdf(src):
 
 def extract_from_image(src):
     """Extract text from an image."""
-    ocr = TesseractOCR(n_threads=2, 
+    ocr = TesseractOCR(n_threads=1, 
                     lang="rus+eng", 
                     psm=11)      
+    is_valid_dpi = None
+    try:
+        is_valid_dpi = check_image_dpi(src)
+    except Exception as e:
+        raise Exception(f"Error: {e}")
+    
+    if not is_valid_dpi:
+        raise LowDPIError("Input image is less than 300 DPI.")
     
     image = preprocess(src)
 
@@ -40,14 +51,13 @@ def extract_from_image(src):
                                         borderless_tables=True,
                                         min_confidence=50)
 
-    dfs = [table.df for table in extracted_tables]
-    return dfs
-
+    return extracted_tables
+    
 
 def save_processed_preview(image, extracted_tables):
     """Save processed image preview to inspect recognition quality."""
     table_img = cv2.imread(image)
-    
+    print(extracted_tables)
     for table in extracted_tables:
         for row in table.content.values():
             for cell in row:
@@ -57,4 +67,9 @@ def save_processed_preview(image, extracted_tables):
     outimage.save("output_table_image.png")
 
 if __name__ == "__main__":
-    extract_from_image('/workspaces/medtesthelper_bot/data/images/analiz.png')
+    image = '/workspaces/medtesthelper_bot/data/images/analiz2.jpg'
+    # image = '/workspaces/medtesthelper_bot/data/images/analiz.png'
+    image = '/workspaces/medtesthelper_bot/data/images/analiz3.jpg'
+    
+    tables = extract_from_image(image)
+    save_processed_preview(image, tables)
