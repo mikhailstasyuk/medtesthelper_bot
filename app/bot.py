@@ -1,14 +1,34 @@
 import json 
+import logging
 import tempfile 
 
 import telebot
+from telebot import util
 
 from app.config import Config
 import app.database as database
 from app.llm import chat, wrap_in_json
-from app.ocr import extract_from_pdf, extract_from_image
+from app.ocr import extract_from_pdf, extract_from_image, LowDPIError
+
 
 config = Config.load_config()
+
+log_level_str = config['log_level']
+if log_level_str: 
+    log_level = logging.getLevelName(log_level_str) 
+else: 
+    log_level = logging.getLevelName(logging.INFO)
+
+logging.basicConfig(
+    filename='/workspaces/medtesthelper_bot/log.log',
+    filemode='a',  
+    level=logging.DEBUG,     
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'  
+)
+
+logger = logging.getLogger(__name__)
+
+logger.info("Testing logging before bot starts...")
 
 def run_bot():
     """Run telegram bot with provided token."""
@@ -19,11 +39,13 @@ def run_bot():
     def save_to_temp_file(binary_data, doc_type):
         """Save binary data to temporary file."""
         try:
+            logger.debug("Trying to save to temporary file...")
             with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{doc_type}') as temp_file:
                 temp_file.write(binary_data)
                 temp_file_path = temp_file.name
                 return temp_file_path
         except Exception as e:
+            logger.error(f"Error saving to temporary file: {e}")
             raise
     
     def check_document_type(document):
@@ -35,8 +57,10 @@ def run_bot():
             if (document.mime_type == f'application/{doc_type}' or 
                 document.file_name.endswith(f'.{doc_type}')):
                 is_supported = True
+                logger.debug(f"Found supported document type:{doc_type}")
                 return is_supported, doc_type
         
+        logger.debug("Attached document type is not supported.")
         return is_supported, None
 
     def load_document():
@@ -51,7 +75,14 @@ def run_bot():
     def start(message):
         """Greet user and set up database."""
         welcome_message = config['welcome_message']
-        bot.reply_to(message, welcome_message)
+        username = message.from_user.first_name
+        prompt = (
+            f"Кратко поприветствуй пользователя"
+            f"{username}, представься и жди комманд."
+            )
+        response = chat(prompt)
+        if response:
+            bot.reply_to(message, response)
         database.create_database_tables()
 
     @bot.message_handler(content_types=['photo'])
@@ -79,6 +110,8 @@ def run_bot():
 
             bot.reply_to(message, f"Processing your {doc_type} file...")
 
+            logger.info("Extracting text from document...")
+            doc_text = None
             if doc_type == 'pdf':
                 try:
                     with open(file_path, 'r') as file:
@@ -86,23 +119,50 @@ def run_bot():
                     bot.reply_to(message, doc_text)
 
                 except Exception as e:
-                    bot.reply_to(message, f"Error extracting text from file. {e}")
+                    error_msg = f"Error extracting text from file. {e}"
+                    logger.error(error_msg)
+                    bot.reply_to(message, error_msg)
                     
             if doc_type in ['png', 'jpeg', 'jpg']:
                 try:
-                    dfs = extract_from_image(file_path)
-                    
-                    dicts = [df.to_dict() for df in dfs]
+                    extracted_tables = extract_from_image(file_path)
+                    dicts = [table.df.to_dict() for table in extracted_tables]
                     doc_text = str(dicts)
+
                     bot.reply_to(message, str(dicts))
 
-                except Exception as e:
-                    bot.reply_to(message, 
-                        f"Error extracting text from file. {e}")
+                except LowDPIError as e:
+                    error_msg = f"Error extracting text from file. {e}"
+                    logger.error(error_msg)
+                    bot.reply_to(message, error_msg)
 
-            response = wrap_in_json(doc_text)
-            bot.reply_to(message, response)
-            add_and_fetch(message, response)
+                except Exception as e:
+                    error_msg = f"Error extracting text from file. {e}"
+                    logger.error(error_msg)
+                    bot.reply_to(message, error_msg)
+
+            if doc_text:
+                logger.debug(f"Extracted doc text: {doc_text}")
+                logger.info("Sending doc text to LLM to parse...")
+
+                response = wrap_in_json(doc_text)
+                if response:
+                    logger.debug(f"Response json: {response}", )
+                
+                    logger.info("Splitting text to chunks...")
+                    for text in util.smart_split(response):
+                        bot.reply_to(message, text)
+
+                    try:
+                        logger.info("Trying to add and fetch data...")
+                        add_and_fetch(message, response)
+                    except Exception as e:
+                        logger.error(f"Error adding and fetching: {e}")
+                        bot.reply_to(message, e)
+                else:
+                    logger.error("Could not get response from LLM.")
+            else:
+                bot.reply_to(message, "Ошибка обработки документа.")
             # files = [file_info.file_path for file_info in file_infos]
             # bot.reply_to(message, ", ".join(files))
         else:
@@ -110,7 +170,7 @@ def run_bot():
                 "Please send the document as a PDF, PNG, or JPEG.")
             
     def add_and_fetch(message, json_string):
-        
+        """Test addding to and fetching from database functionality"""
         if json_string:
             result = database.add_and_fetch(message.chat.id, json_string)
             bot.reply_to(message, result)
