@@ -1,10 +1,30 @@
+import logging
 import os
+import time
 
 from groq import Groq
 
 from app.config import Config
 
+
 config = Config.load_config()
+
+log_level_str = config['log_level']
+if log_level_str: 
+    log_level = logging.getLevelName(log_level_str) 
+else: 
+    log_level = logging.getLevelName(logging.INFO)
+
+logging.basicConfig(
+    filename='/workspaces/medtesthelper_bot/log.log',
+    filemode='a',  
+    level=logging.DEBUG,     
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'  
+)
+
+logger = logging.getLogger(__name__)
+
+RETRIES = 3
 
 def chat(message):
     client = Groq(
@@ -24,9 +44,18 @@ def chat(message):
     ],
     model="llama3-groq-70b-8192-tool-use-preview",
     )
-    response = chat_completion.choices[0].message.content
-    print(response)
-    return response
+
+    for i in range(RETRIES):
+        try:
+            logger.debug(f"Getting response from LLM API try: {i}")
+            response = chat_completion.choices[0].message.content
+
+            return response
+        except Exception as e:
+            logger.error(f"Error getting response from LLM API: {e}")
+            time.sleep(30)
+    
+    raise
 
 
 def wrap_in_json(text):
