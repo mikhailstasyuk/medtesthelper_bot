@@ -1,3 +1,4 @@
+from datetime import datetime
 import json 
 import logging
 import tempfile 
@@ -35,6 +36,7 @@ def run_bot():
     BOT_TOKEN = config['bot_token']
     bot = telebot.TeleBot(BOT_TOKEN)
     file_infos = []
+
 
     def save_to_temp_file(binary_data, doc_type):
         """Save binary data to temporary file."""
@@ -127,8 +129,10 @@ def run_bot():
                 try:
                     extracted_tables = extract_from_image(file_path)
                     dicts = [table.df.to_dict() for table in extracted_tables]
-                    doc_text = str(dicts)
-
+                    if dicts:
+                        doc_text = str(dicts)
+                    else:
+                        doc_text = None
                     bot.reply_to(message, str(dicts))
 
                 except LowDPIError as e:
@@ -184,8 +188,15 @@ def run_bot():
     @bot.message_handler(content_types=['text'])
     def echo_message(message):
         username = message.from_user.first_name
+        timestamp = message.date
+        message_date = datetime.fromtimestamp(timestamp)
         
-        response = chat(f"{username}: {message.text}")
+        response = chat(f"{message_date} {username}: {message.text}")
+        if "/query" in response:
+            query_type, name, dates = database.parse_query(response)
+            start_date, end_date = dates
+            bot.reply_to(message, f"{name} {start_date} {end_date}")
+            return query_type, name, start_date, end_date
         bot.reply_to(message, response)
     
 
