@@ -55,5 +55,6 @@ class StudyData(Base):
     recommendation = Column(Text)
     document = relationship("MedicalDocument", back_populates="study_data")
 
+
 def create_tables(engine):
     Base.metadata.create_all(engine)
