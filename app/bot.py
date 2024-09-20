@@ -193,10 +193,13 @@ def run_bot():
         
         response = chat(f"{message_date} {username}: {message.text}")
         if "/query" in response:
-            query_type, name, dates = database.parse_query(response)
-            start_date, end_date = dates
-            bot.reply_to(message, f"{name} {start_date} {end_date}")
-            return query_type, name, start_date, end_date
+            try:
+                query_type, name, dates = database.parse_query(response)
+                start_date, end_date = dates
+                bot.reply_to(message, f"{name} {start_date} {end_date}")
+                return query_type, name, start_date, end_date
+            except:
+                bot.reply_to(message, "Ошибка запроса данных.")        
         bot.reply_to(message, response)
     
 
