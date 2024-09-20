@@ -10,7 +10,7 @@ class Config:
         BOT_TOKEN = os.getenv('BOT_TOKEN')
 
         # OCR
-        MIN_DPI = 300
+        MIN_DPI = 295
    
         # Database
         DB_NAME = os.getenv('POSTGRES_DB')
