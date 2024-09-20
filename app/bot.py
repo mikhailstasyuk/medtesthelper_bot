@@ -37,7 +37,6 @@ def run_bot():
     bot = telebot.TeleBot(BOT_TOKEN)
     file_infos = []
 
-
     def save_to_temp_file(binary_data, doc_type):
         """Save binary data to temporary file."""
         try:
@@ -73,10 +72,27 @@ def run_bot():
         else:
             return None
 
+    def handle_queries(message, query_string):
+        """Parse the query and search database."""
+        try:
+            query_type, document_type, dates = database.parse_query(query_string)
+            start_date, end_date = dates
+            data = database.fetch_data_by_period(
+                message.chat.id, query_type, document_type, start_date, end_date
+            )
+
+            if data:
+                return data
+            else:
+                raise Exception("Не найдено данных за указанный период.")
+        except Exception as e:
+            logger.error(f"Query error: {e}")
+            raise Exception(f"Ошибка запроса: {e}")
+
+
     @bot.message_handler(commands=['start'])
     def start(message):
         """Greet user and set up database."""
-        welcome_message = config['welcome_message']
         username = message.from_user.first_name
         prompt = (
             f"Кратко поприветствуй пользователя"
@@ -93,7 +109,7 @@ def run_bot():
         photo = message.photo
 
         if photo:
-            bot.reply_to(message, "Please attach PNG or JPEG files as documents.")
+            bot.reply_to(message, "Пожалуйста, прикрепите изображение как документ.")
 
     @bot.message_handler(content_types=['document'])
     def handle_document(message):
@@ -110,7 +126,7 @@ def run_bot():
             downloaded_file = bot.download_file(file_info.file_path)
             file_path = save_to_temp_file(downloaded_file, doc_type)
 
-            bot.reply_to(message, f"Processing your {doc_type} file...")
+            bot.reply_to(message, f"Обрабатываю документ...")
 
             logger.info("Extracting text from document...")
             doc_text = None
@@ -118,7 +134,7 @@ def run_bot():
                 try:
                     with open(file_path, 'r') as file:
                         doc_text = extract_from_pdf(file)
-                    bot.reply_to(message, doc_text)
+                    # bot.reply_to(message, doc_text)
 
                 except Exception as e:
                     error_msg = f"Error extracting text from file. {e}"
@@ -133,7 +149,7 @@ def run_bot():
                         doc_text = str(dicts)
                     else:
                         doc_text = None
-                    bot.reply_to(message, str(dicts))
+                    # bot.reply_to(message, str(dicts))
 
                 except LowDPIError as e:
                     error_msg = f"Error extracting text from file. {e}"
@@ -153,13 +169,10 @@ def run_bot():
                 if response:
                     logger.debug(f"Response json: {response}", )
                 
-                    logger.info("Splitting text to chunks...")
-                    for text in util.smart_split(response):
-                        bot.reply_to(message, text)
-
                     try:
-                        logger.info("Trying to add and fetch data...")
-                        add_and_fetch(message, response)
+                        logger.info("Trying to add new document to database...")
+                        add_document(message, response)
+                        bot.reply_to(message, "Документ успешно добавлен.")
                     except Exception as e:
                         logger.error(f"Error adding and fetching: {e}")
                         bot.reply_to(message, e)
@@ -171,19 +184,15 @@ def run_bot():
             # bot.reply_to(message, ", ".join(files))
         else:
             bot.reply_to(message,
-                "Please send the document as a PDF, PNG, or JPEG.")
+                "Пожалуйста, пришлите документ в формате PDF, PNG или JPEG.")
             
-    def add_and_fetch(message, json_string):
+    def add_document(message, json_string):
         """Test addding to and fetching from database functionality"""
         if json_string:
-            result = database.add_and_fetch(message.chat.id, json_string)
-            bot.reply_to(message, result)
-        else:
-            msg_to_user = (
-                "Please upload at least one document. " 
-                "Supported types: json, pdf, png, jpeg."
-            )
-            bot.reply_to(message, msg_to_user)
+            try:
+                result = database.add_document(message.chat.id, json_string)
+            except Exception as e:
+                bot.reply_to(f"Ошибка при добавлении документа: {e}")
 
     @bot.message_handler(content_types=['text'])
     def echo_message(message):
@@ -194,13 +203,14 @@ def run_bot():
         response = chat(f"{message_date} {username}: {message.text}")
         if "/query" in response:
             try:
-                query_type, name, dates = database.parse_query(response)
-                start_date, end_date = dates
-                bot.reply_to(message, f"{name} {start_date} {end_date}")
-                return query_type, name, start_date, end_date
-            except:
-                bot.reply_to(message, "Ошибка запроса данных.")        
-        bot.reply_to(message, response)
+                data = handle_queries(message, response)
+                for text in util.smart_split(data):
+                    bot.reply_to(message, text)
+
+            except Exception as e:
+                bot.reply_to(message, f"Ошибка: {e}")
+        else:                
+            bot.reply_to(message, response)
     
 
     bot.infinity_polling()
