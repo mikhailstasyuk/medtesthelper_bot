@@ -9,6 +9,9 @@ from img2table.document import PDF
 import pandas as pd
 import pymupdf4llm
 
+from app.config import Config
+
+config = Config.load_config()
 
 from app.preprocesssing import preprocess, check_image_dpi
 
@@ -30,12 +33,13 @@ def extract_from_image(src):
                     psm=3)      
     is_valid_dpi = None
     try:
-        is_valid_dpi = check_image_dpi(src)
+        min_dpi = config['min_dpi']
+        is_valid_dpi = check_image_dpi(src, min_dpi)
     except Exception as e:
         raise Exception(f"Error: {e}")
     
     if not is_valid_dpi:
-        raise LowDPIError("Input image is less than 300 DPI.")
+        raise LowDPIError(f"Input image is less than {min_dpi} DPI.")
     
     image = preprocess(src)
 
