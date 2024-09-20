@@ -10,7 +10,7 @@ def threshold(src):
     return thresh
 
 
-def check_image_dpi(image_path, min_dpi=295):
+def check_image_dpi(image_path, min_dpi=100):
     """Check if input image has minimum 300 DPI"""
     try:
         with Image.open(image_path) as img:
