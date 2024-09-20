@@ -2,7 +2,7 @@ import logging
 import os
 import time
 
-from groq import Groq
+from groq import Groq, InternalServerError
 
 from app.config import Config
 
@@ -31,31 +31,34 @@ def chat(message):
     api_key=config['groq_token'],
     )
 
-    chat_completion = client.chat.completions.create(
-    messages=[
-        {
-            "role": "system",
-            "content": config['system_prompt']
-        },
-        {
-            "role": "user",
-            "content": message,
-        }
-    ],
-    model="llama3-groq-70b-8192-tool-use-preview",
-    )
+    try:
+        chat_completion = client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": config['system_prompt']
+            },
+            {
+                "role": "user",
+                "content": message,
+            }
+        ],
+        model="llama3-groq-70b-8192-tool-use-preview",
+        )
 
-    for i in range(RETRIES):
-        try:
-            logger.debug(f"Getting response from LLM API try: {i}")
-            response = chat_completion.choices[0].message.content
+        for i in range(RETRIES):
+            try:
+                logger.debug(f"Getting response from LLM API try: {i}")
+                response = chat_completion.choices[0].message.content
 
-            return response
-        except Exception as e:
-            logger.error(f"Error getting response from LLM API: {e}")
-            time.sleep(30)
-    
-    raise
+                return response
+            except Exception as e:
+                logger.error(f"Error getting response from LLM API: {e}")
+                time.sleep(30)
+    except InternalServerError:
+        return "Groq: InternalServerError"
+    except:
+        return "Groq: Unnown Error"
 
 
 def wrap_in_json(text):
