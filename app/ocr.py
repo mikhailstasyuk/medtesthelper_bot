@@ -9,6 +9,7 @@ from img2table.document import PDF
 import pandas as pd
 import pymupdf4llm
 
+
 from app.preprocesssing import preprocess, check_image_dpi
 
 class LowDPIError(Exception):
@@ -26,7 +27,7 @@ def extract_from_image(src):
     """Extract text from an image."""
     ocr = TesseractOCR(n_threads=1, 
                     lang="rus+eng", 
-                    psm=11)      
+                    psm=3)      
     is_valid_dpi = None
     try:
         is_valid_dpi = check_image_dpi(src)
@@ -68,8 +69,9 @@ def save_processed_preview(image, extracted_tables):
 
 if __name__ == "__main__":
     image = '/workspaces/medtesthelper_bot/data/images/analiz2.jpg'
-    # image = '/workspaces/medtesthelper_bot/data/images/analiz.png'
-    image = '/workspaces/medtesthelper_bot/data/images/analiz3.jpg'
+    image = '/workspaces/medtesthelper_bot/data/images/analiz.png'
+    # image = '/workspaces/medtesthelper_bot/data/images/analiz3.jpg'
+    # image = '/workspaces/medtesthelper_bot/data/images/diagnostica-1.png'
     
     tables = extract_from_image(image)
     save_processed_preview(image, tables)
