@@ -1,5 +1,6 @@
 from datetime import date
 import logging
+import re
 from typing import Union, List, Dict, Any
 
 from sqlalchemy import create_engine
@@ -139,7 +140,6 @@ def fetch_latest_medical_data(session: Session, telegram_id: int, document_type:
     if not latest_document:
         return None  
     
-    # Initialize result without data_format
     fetched = {
         "document_type": latest_document.document_type,
         "document_date": latest_document.document_date,
@@ -147,7 +147,6 @@ def fetch_latest_medical_data(session: Session, telegram_id: int, document_type:
         "data": []
     }
 
-    # Fetch test or study data based on the actual data present
     test_data = session.query(TestData).filter(TestData.document_id == latest_document.document_id).all()
     if test_data:
         fetched["data_format"] = 'test'
@@ -158,6 +157,7 @@ def fetch_latest_medical_data(session: Session, telegram_id: int, document_type:
             "range": item.range,
             "commentary": item.commentary
         } for item in test_data]
+
     else:
         study_data = session.query(StudyData).filter(StudyData.document_id == latest_document.document_id).all()
         if study_data:
@@ -197,3 +197,31 @@ def add_and_fetch(telegram_id, document_json):
                 return f"Device: {data['device']}, Recommendation: {data['recommendation']}"
         else:
             return "No data found for this user."
+        
+
+def parse_query(query_string):
+    """Parse LLM query command."""
+    print(query_string)
+    pattern = r"/query_(study|test)"
+
+    match = re.search(pattern, query_string)
+    if match:
+        query_type = match.group(1)
+        print("Type:", query_type)
+    else:
+        raise
+    
+    pattern = r"--name\s+'([^']+)'\s+--start\s+(\d{4}-\d{2}-\d{2})\s+--end\s+(\d{4}-\d{2}-\d{2})"
+
+    match = re.search(pattern, query_string)
+
+    if match:
+        name = match.group(1)
+        start_date = match.group(2)
+        end_date = match.group(3)
+        dates = [start_date, end_date]
+
+        return (query_type, name, dates)
+    else:
+        raise
+    
